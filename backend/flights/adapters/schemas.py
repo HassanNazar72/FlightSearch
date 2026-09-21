@@ -2,7 +2,8 @@
 
 Every family names its fields differently (fare / ticket_price / amount / ...),
 encodes time differently (ISO, split date+time+tz, epoch, UTC, basic-ISO) and
-prices differently (float, cents, "€480.00", base+taxes).
+prices differently (float, cents, a "$480.00" string) and stops differently
+(number, layover count, boolean).
 Importing this module registers all adapters.
 """
 import re
@@ -13,7 +14,6 @@ from zoneinfo import ZoneInfo
 from flights.adapters.base import BaseAdapter, build_flight, local_tz
 from flights.adapters.registry import register
 from flights.domain import Flight
-from flights.reference import CURRENCY_SYMBOLS
 
 
 @register("fare_iso")
@@ -71,8 +71,8 @@ class TicketPriceNestedAdapter(BaseAdapter):
 
 @register("amount_epoch")
 class AmountEpochAdapter(BaseAdapter):
-    """[{"amount": 52340, "ccy", "carrier_code", "number", "src", "dst", "dep_epoch", "arr_epoch", "layovers": [...]}]
-    Bare list, price in minor units (cents), Unix-epoch times, stops = number of layovers."""
+    """[{"amount": 52340, "ccy", "carrier_code", "number", "src", "dst", "dep_epoch", "arr_epoch", "layover_count"}]
+    Bare list, price in minor units (cents), Unix-epoch times."""
 
     def extract_items(self, raw: Any) -> list[Any]:
         return raw
@@ -87,19 +87,19 @@ class AmountEpochAdapter(BaseAdapter):
             destination=item["dst"],
             departure=datetime.fromtimestamp(item["dep_epoch"], tz=timezone.utc),
             arrival=datetime.fromtimestamp(item["arr_epoch"], tz=timezone.utc),
-            stops=len(item["layovers"]),
+            stops=item["layover_count"],
             price=item["amount"] / 100,
             currency=item["ccy"],
         )
 
 
-_PRICE_RE = re.compile(r"^\s*([$€£])\s*([\d,]+(?:\.\d+)?)\s*$")
+_PRICE_RE = re.compile(r"^\s*\$\s*([\d,]+(?:\.\d+)?)\s*$")
 
 
 @register("offers_duration")
 class OffersDurationAdapter(BaseAdapter):
     """{"offers": [{"airlineName", "flightCode": "BA 117", "origin_iata", "dest_iata",
-    "departureLocal": "2026-10-01 18:30", "durationMinutes", "totalPrice": "€480.00", "numStops"}]}
+    "departureLocal": "2026-10-01 18:30", "durationMinutes", "totalPrice": "$480.00", "numStops"}]}
     No arrival time (derived from duration), price is a formatted string."""
 
     def extract_items(self, raw: Any) -> list[Any]:
@@ -109,7 +109,7 @@ class OffersDurationAdapter(BaseAdapter):
         match = _PRICE_RE.match(item["totalPrice"])
         if not match:
             raise ValueError(f'unparseable price {item["totalPrice"]!r}')
-        symbol, amount = match.groups()
+        amount = match.group(1)
 
         origin = item["origin_iata"]
         departure = datetime.strptime(item["departureLocal"], "%Y-%m-%d %H:%M").replace(
@@ -126,37 +126,6 @@ class OffersDurationAdapter(BaseAdapter):
             arrival=arrival,
             stops=item["numStops"],
             price=float(amount.replace(",", "")),
-            currency=CURRENCY_SYMBOLS[symbol],
-        )
-
-
-@register("segments_pricing")
-class SegmentsPricingAdapter(BaseAdapter):
-    """{"flights": [{"segments": [{"carrier", "flight_number", "from": {"iata", "time"}, "to": {...}}],
-    "pricing": {"base", "taxes", "currency"}}]}
-    Multi-leg itineraries with airport-local wall-clock times; total = base + taxes."""
-
-    def extract_items(self, raw: Any) -> list[Any]:
-        return raw["flights"]
-
-    @staticmethod
-    def _local(point: dict) -> datetime:
-        return datetime.fromisoformat(point["time"]).replace(tzinfo=local_tz(point["iata"]))
-
-    def to_flight(self, item: Any, provider_id: str) -> Flight:
-        first, last = item["segments"][0], item["segments"][-1]
-        pricing = item["pricing"]
-        return build_flight(
-            provider_id=provider_id,
-            airline=first["carrier"],
-            flight_number=f'{first["carrier"]}{first["flight_number"]}',
-            origin=first["from"]["iata"],
-            destination=last["to"]["iata"],
-            departure=self._local(first["from"]),
-            arrival=self._local(last["to"]),
-            stops=len(item["segments"]) - 1,
-            price=pricing["base"] + pricing["taxes"],
-            currency=pricing["currency"],
         )
 
 

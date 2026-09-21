@@ -4,8 +4,12 @@ import os
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Local development: read backend/.env. Real environment variables (e.g. on Render) take precedence.
+load_dotenv(BASE_DIR / ".env")
 
 
 def env_list(name: str, default: str = "") -> list[str]:

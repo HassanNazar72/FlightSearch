@@ -13,3 +13,6 @@ dist/
 .env.*
 !.env.example
 *.log
+
+# Generated documents (kept local)
+docs/

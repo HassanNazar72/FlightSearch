@@ -1,4 +1,4 @@
-"""Static reference data: airports, airlines and currency rates.
+"""Static reference data: airports and airlines.
 
 Shared by the mock providers (to synthesise realistic flights) and by the
 adapters (to resolve codes and time zones while normalising).
@@ -63,9 +63,6 @@ AIRPORTS: dict[str, Airport] = _airports(
     ("CAI", "Cairo", 30.1219, 31.4056, "Africa/Cairo"),
 )
 
-# Airports the mock generator uses for connections.
-HUBS = ("AMS", "FRA", "DXB", "IST", "DOH", "CDG", "LHR", "ATL", "ORD")
-
 AIRLINES: tuple[Airline, ...] = (
     Airline("BA", "British Airways"),
     Airline("AA", "American Airlines"),
@@ -84,28 +81,6 @@ AIRLINES: tuple[Airline, ...] = (
 )
 AIRLINES_BY_CODE = {a.code: a for a in AIRLINES}
 AIRLINES_BY_NAME = {a.name.lower(): a for a in AIRLINES}
-
-# Fixed demo rates (units of USD per 1 unit of currency). A real system would
-# refresh these from an FX API and record the rate used for each quote.
-USD_PER_UNIT: dict[str, float] = {
-    "USD": 1.0,
-    "EUR": 1.09,
-    "GBP": 1.27,
-    "CAD": 0.73,
-    "AED": 0.272,
-    "INR": 0.012,
-}
-CURRENCY_SYMBOLS = {"$": "USD", "€": "EUR", "£": "GBP"}
-SYMBOL_BY_CURRENCY = {v: k for k, v in CURRENCY_SYMBOLS.items()}
-
-
-def to_usd(amount: float, currency: str) -> float:
-    return round(amount * USD_PER_UNIT[currency], 2)
-
-
-def from_usd(amount_usd: float, currency: str) -> float:
-    return round(amount_usd / USD_PER_UNIT[currency], 2)
-
 
 def distance_km(a: Airport, b: Airport) -> float:
     """Great-circle (haversine) distance."""

@@ -6,7 +6,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from flights.domain import Flight
-from flights.reference import AIRLINES_BY_CODE, AIRLINES_BY_NAME, AIRPORTS, to_usd
+from flights.reference import AIRLINES_BY_CODE, AIRLINES_BY_NAME, AIRPORTS
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ def build_flight(
     arrival: datetime,
     stops: int,
     price: float,
-    currency: str,
+    currency: str = "USD",
 ) -> Flight:
     """Single place where canonical invariants are enforced, so every adapter
     produces identical output regardless of how the provider shaped its data."""
@@ -73,6 +73,8 @@ def build_flight(
         raise ValueError("arrival before departure")
     if price <= 0:
         raise ValueError("non-positive price")
+    if currency != "USD":  # this prototype's providers all quote USD
+        raise ValueError(f"unsupported currency {currency!r}")
 
     origin, destination = origin.upper(), destination.upper()
     departure = departure.astimezone(local_tz(origin))
@@ -93,6 +95,6 @@ def build_flight(
         arrival_time=arrival,
         duration_minutes=round(duration.total_seconds() / 60),
         stops=int(stops),
-        price_usd=to_usd(float(price), currency),
+        price_usd=round(float(price), 2),
         currency=currency,
     )

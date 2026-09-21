@@ -15,7 +15,7 @@ export interface Flight {
   duration_minutes: number
   stops: number
   price_usd: number
-  /** Currency the provider originally quoted in (price_usd is already converted). */
+  /** Always "USD" in this prototype. */
   currency: string
   /** 0-100 weighted price/duration score, higher is better. */
   score: number

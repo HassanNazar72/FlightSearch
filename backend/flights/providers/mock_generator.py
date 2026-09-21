@@ -26,7 +26,6 @@ CHAOS: dict[int, str] = {13: "error", 37: "error", 58: "error", 72: "timeout", 9
 class MockProvider:
     id: str
     schema: str
-    currency: str
     markup: float  # each provider prices a bit differently
     latency: tuple[float, float]  # seconds, uniform range
     failure: str | None = None  # "error" | "timeout" | None
@@ -41,8 +40,7 @@ class MockProvider:
         if settings.MOCK_CHAOS_ENABLED and self.failure == "error":
             raise ProviderError("HTTP 503 Service Unavailable")
 
-        renderer, _ = RENDERERS[self.schema]
-        return renderer(generate_itineraries(self.id, self.markup, query), self.currency)
+        return RENDERERS[self.schema](generate_itineraries(self.id, self.markup, query))
 
 
 @lru_cache(maxsize=1)
@@ -52,12 +50,10 @@ def get_providers() -> tuple[MockProvider, ...]:
     for n in range(1, PROVIDER_COUNT + 1):
         rng = random.Random(n)  # stable config across restarts
         schema = schemas[(n - 1) % len(schemas)]
-        _, currencies = RENDERERS[schema]
         providers.append(
             MockProvider(
                 id=f"provider_{n:03d}",
                 schema=schema,
-                currency=rng.choice(currencies),
                 markup=round(rng.uniform(0.92, 1.15), 3),
                 latency=(0.05, rng.choice([0.3, 0.6, 0.9])),
                 failure=CHAOS.get(n),

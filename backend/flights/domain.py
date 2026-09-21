@@ -33,7 +33,7 @@ class Flight:
     duration_minutes: int
     stops: int
     price_usd: float
-    currency: str  # currency the provider originally quoted in
+    currency: str  # always "USD" in this prototype
     # Filled in by the ranking step, not by adapters.
     score: float = 0.0
     tags: list[str] = field(default_factory=list)

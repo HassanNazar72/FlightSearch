@@ -74,7 +74,7 @@ export default function FlightCard({ flight, selected, onSelect }: Props) {
           <div className="text-right">
             <div className="text-2xl font-bold">{formatPrice(flight.price_usd)}</div>
             <div className="text-xs text-slate-400" title="Provider that supplied this fare">
-              via {flight.provider_id.replace('provider_', 'P-')} · {flight.currency}
+              via {flight.provider_id.replace('provider_', 'P-')}
             </div>
           </div>
           <button

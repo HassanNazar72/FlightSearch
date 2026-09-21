@@ -10,39 +10,28 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from flights.domain import SearchQuery
-from flights.reference import AIRLINES, AIRPORTS, HUBS, Airline, distance_km
-
-
-@dataclass(frozen=True)
-class Leg:
-    airline: Airline
-    number: int
-    origin: str
-    destination: str
-    departure: datetime  # tz-aware, airport-local
-    arrival: datetime
+from flights.reference import AIRLINES, AIRPORTS, Airline, distance_km
 
 
 @dataclass(frozen=True)
 class Itinerary:
-    legs: tuple[Leg, ...]
+    airline: Airline
+    number: int
+    origin: str
+    destination: str
+    departure: datetime  # tz-aware, origin-airport local time
+    arrival: datetime  # tz-aware, destination-airport local time
+    stops: int
     price_usd: float
 
     @property
-    def first(self) -> Leg:
-        return self.legs[0]
-
-    @property
-    def last(self) -> Leg:
-        return self.legs[-1]
-
-    @property
-    def stops(self) -> int:
-        return len(self.legs) - 1
-
-    @property
     def flight_code(self) -> str:
-        return f"{self.first.airline.code}{self.first.number}"
+        return f"{self.airline.code}{self.number}"
+
+    @property
+    def duration_minutes(self) -> int:
+        elapsed = self.arrival.astimezone(timezone.utc) - self.departure.astimezone(timezone.utc)
+        return round(elapsed.total_seconds() / 60)
 
 
 CRUISE_KMH = 830
@@ -68,33 +57,19 @@ def generate_itineraries(provider_id: str, markup: float, query: SearchQuery) ->
             rng.randint(5, 22), rng.randrange(0, 60, 5),
             tzinfo=ZoneInfo(origin.tz),
         )  # fmt: skip
-        wind_and_routing = rng.uniform(0.94, 1.08)  # so two flights on one route rarely take identical time
-        air_minutes = round(km / CRUISE_KMH * 60 * wind_and_routing * (1.1 if stops else 1.0)) + 30
 
+        wind_and_routing = rng.uniform(0.94, 1.08)  # so two flights on one route rarely take identical time
+        minutes = round(km / CRUISE_KMH * 60 * wind_and_routing) + 30
         if stops:
-            hub = rng.choice([h for h in HUBS if h not in (query.origin, query.destination)])
-            layover = rng.randint(75, 200)
-            first_minutes = air_minutes // 2
-            legs = _two_legs(airline, number, query, hub, departure, first_minutes,
-                             layover, air_minutes - first_minutes, rng)  # fmt: skip
-        else:
-            legs = (_leg(airline, number, query.origin, query.destination, departure, air_minutes),)
+            minutes += rng.randint(75, 200)  # layover time
+
+        # Add the flight time in UTC: datetime + timedelta on a ZoneInfo datetime is
+        # wall-clock arithmetic and would be off by an hour across a DST change.
+        arrival_utc = departure.astimezone(timezone.utc) + timedelta(minutes=minutes)
+        arrival = arrival_utc.astimezone(ZoneInfo(dest.tz))
 
         price = (45 + km * 0.085) * rng.uniform(0.75, 1.45) * markup * (0.82 if stops else 1.0)
-        itineraries.append(Itinerary(legs=legs, price_usd=round(price, 2)))
+        itineraries.append(
+            Itinerary(airline, number, query.origin, query.destination, departure, arrival, stops, round(price, 2))
+        )
     return itineraries
-
-
-def _leg(airline, number, origin, destination, departure, minutes) -> Leg:
-    # Add the flight time in UTC: datetime + timedelta on a ZoneInfo datetime is
-    # wall-clock arithmetic and would be off by an hour across a DST change.
-    arrival_utc = departure.astimezone(timezone.utc) + timedelta(minutes=minutes)
-    arrival = arrival_utc.astimezone(ZoneInfo(AIRPORTS[destination].tz))
-    return Leg(airline, number, origin, destination, departure, arrival)
-
-
-def _two_legs(airline, number, query, hub, departure, first_minutes, layover, second_minutes, rng):
-    first = _leg(airline, number, query.origin, hub, departure, first_minutes)
-    second_departure = first.arrival + timedelta(minutes=layover)
-    second = _leg(airline, rng.randint(100, 999), hub, query.destination, second_departure, second_minutes)
-    return (first, second)

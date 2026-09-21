@@ -10,12 +10,10 @@ everything into one canonical schema, then tags the **Cheapest**, **Fastest** an
 React (Vercel) --GET /api/search--> Django API (Render)
                                       |-- cache hit? return
                                       |-- ThreadPoolExecutor: 100 provider.fetch() in parallel, 1.5s deadline
-                                      |-- adapter registry: 7 schema adapters -> canonical Flight
+                                      |-- adapter registry: 6 schema adapters -> canonical Flight
                                       |-- ranking: score + cheapest/fastest/recommended tags
                                       '-- cache result, return {query, meta, flights}
 ```
-
-Interview prep: [docs/SkyCompare-Project-Guide.pdf](docs/SkyCompare-Project-Guide.pdf) (how it works, CV bullets, 40 Q&A).
 
 ## Run locally
 
@@ -27,6 +25,7 @@ cd backend
 python -m venv .venv
 .venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
 pip install -r requirements-dev.txt
+copy .env.example .env          # macOS/Linux: cp .env.example .env (optional; defaults work without it)
 python manage.py runserver      # http://localhost:8000
 ```
 
@@ -56,7 +55,7 @@ cd backend && pytest
   "flights": [{ "id": "...", "provider_id": "provider_048", "airline": "Qatar Airways", "flight_number": "QR363",
                 "origin": "JFK", "destination": "LHR",
                 "departure_time": "2026-10-15T08:45-04:00", "arrival_time": "2026-10-15T20:46+01:00",
-                "duration_minutes": 421, "stops": 0, "price_usd": 393.4, "currency": "GBP",
+                "duration_minutes": 421, "stops": 0, "price_usd": 393.4, "currency": "USD",
                 "score": 87.2, "tags": ["recommended"] }]
 }
 ```
@@ -104,7 +103,7 @@ backend/
   flights/
     domain.py             canonical Flight + query/result types
     reference.py          airports, airlines, FX rates
-    adapters/             BaseAdapter, registry, 7 schema adapters
+    adapters/             BaseAdapter, registry, 6 schema adapters
     providers/            mock generator: itineraries, per-schema renderers, 100 providers
     services/             aggregator (fan-out, cache), ranking (score + tags)
     serializers.py views.py urls.py
